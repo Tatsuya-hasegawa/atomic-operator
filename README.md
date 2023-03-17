@@ -1,7 +1,19 @@
-[![Testing atomic-operator on Ubuntu](https://github.com/swimlane/atomic-operator/actions/workflows/ubuntu.yml/badge.svg)](https://github.com/swimlane/atomic-operator/actions/workflows/ubuntu.yml) ![](./images/ubuntu_support.svg)
-[![Testing atomic-operator on Windows](https://github.com/swimlane/atomic-operator/actions/workflows/windows.yml/badge.svg)](https://github.com/swimlane/atomic-operator/actions/workflows/windows.yml) ![](./images/windows_support.svg)
-[![Testing atomic-operator on macOS](https://github.com/swimlane/atomic-operator/actions/workflows/macos.yml/badge.svg)](https://github.com/swimlane/atomic-operator/actions/workflows/macos.yml) ![](./images/macos_support.svg)
-![](./images/coverage.svg)
+[![PyPI](https://img.shields.io/pypi/v/atomic-operator.svg)][pypi status]
+[![Status](https://img.shields.io/pypi/status/atomic-operator.svg)][pypi status]
+[![Python Version](https://img.shields.io/pypi/pyversions/atomic-operator)][pypi status]
+[![License](https://img.shields.io/pypi/l/atomic-operator)][license]
+
+[![Read the documentation at https://atomic-operator.com/](https://img.shields.io/readthedocs/czds/latest.svg?label=Read%20the%20Docs)][read the docs]
+[![Code Quality & Tests](https://github.com/Swimlane/atomic-operator/actions/workflows/quality.yml/badge.svg)](https://github.com/Swimlane/atomic-operator/actions/workflows/quality.yml)
+
+[![Black](https://img.shields.io/badge/code%20style-black-000000.svg)][black]
+
+[pypi status]: https://pypi.org/project/atomic-operator/
+[read the docs]: https://atomic-operator.com
+[tests]: https://github.com/Swimlane/atomic-operator/actions?workflow=Quality
+[codecov]: https://app.codecov.io/gh/Swimlane/atomic-operator
+[pre-commit]: https://github.com/pre-commit/pre-commit
+[black]: https://github.com/psf/black
 
 # atomic-operator
 
@@ -30,6 +42,9 @@ Additionally, `atomic-operator` can be used in many other situations like:
 * Assist with downloading the atomic-red-team repository
 * Can be automated further based on a configuration file
 * A command-line and importable Python package
+* Select specific tests when one or more techniques are specified
+* Search across all atomics for that perfect test
+* Pass input_arguments as input for tests via command line
 * Plus more
 
 ## Getting Started
@@ -62,6 +77,7 @@ pyyaml==5.4.1
 fire==0.4.0
 requests==2.26.0
 attrs==21.2.0
+pick==1.2.0
 ```
 
 ### macOS, Linux and Windows:
@@ -70,11 +86,28 @@ attrs==21.2.0
 pip install atomic-operator
 ```
 
+### macOS using M1 processor
+
+```bash
+git clone https://github.com/swimlane/atomic-operator.git
+cd atomic-operator
+
+# Satisfy ModuleNotFoundError: No module named 'setuptools_rust'
+brew install rust
+pip3 install --upgrade pip
+pip3 install setuptools_rust
+
+# Back to our regularly scheduled programming . . .  
+pip install -r requirements.txt
+python setup.py install
+```
+
 ### Installing from source
 
 ```bash
 git clone https://github.com/swimlane/atomic-operator.git
 cd atomic-operator
+pip install -r requirements.txt
 python setup.py install
 ```
 
@@ -108,6 +141,33 @@ In order to run a test you must provide some additional properties (and options 
 atomic-operator run --atomics-path "/tmp/some_directory/redcanaryco-atomic-red-team-3700624"
 ```
 
+You can select individual tests when you provide one or more specific techniques. For example running the following on the command line:
+
+```bash
+atomic-operator run --techniques T1564.001 --select_tests
+```
+
+Will prompt the user with a selection list of tests associated with that technique. A user can select one or more tests by using the space bar to highlight the desired test:
+
+```text
+ Select Test(s) for Technique T1564.001 (Hide Artifacts: Hidden Files and Directories)
+
+ * Create a hidden file in a hidden directory (61a782e5-9a19-40b5-8ba4-69a4b9f3d7be)
+   Mac Hidden file (cddb9098-3b47-4e01-9d3b-6f5f323288a9)
+   Create Windows System File with Attrib (f70974c8-c094-4574-b542-2c545af95a32)
+   Create Windows Hidden File with Attrib (dadb792e-4358-4d8d-9207-b771faa0daa5)
+   Hidden files (3b7015f2-3144-4205-b799-b05580621379)
+   Hide a Directory (b115ecaf-3b24-4ed2-aefe-2fcb9db913d3)
+   Show all hidden files (9a1ec7da-b892-449f-ad68-67066d04380c)
+```
+
+The following will allow you to provide custom input arguments for tests. You do this providing a dictionary of keys and values as a dictionary to the `input_arguments` parameter on the run method.
+
+```bash
+atomic-operator run --techniques T1564.001 --input_arguments '{"project-id": "some_value", "another_key": "another value"}'
+# Please include single quotes around the input_arguments value.
+```
+
 ### Running Tests Remotely
 
 In order to run a test remotely you must provide some additional properties (and options if desired). The main method to run tests is named `run`.
@@ -133,7 +193,9 @@ atomic-operator run -- --help
 |--------------|----|-------|-----------|
 |techniques|list|all|One or more defined techniques by attack_technique ID.|
 |test_guids|list|None|One or more Atomic test GUIDs.|
+|select_tests|bool|False|Select one or more atomic tests to run when a techniques are specified.|
 |atomics_path|str|os.getcwd()|The path of Atomic tests.|
+|input_arguments|dict|{}|A dictionary of input arguments to pass to the test.|
 |check_prereqs|bool|False|Whether or not to check for prereq dependencies (prereq_comand).|
 |get_prereqs|bool|False|Whether or not you want to retrieve prerequisites.|
 |cleanup|bool|False|Whether or not you want to run cleanup command(s).|
@@ -143,6 +205,7 @@ atomic-operator run -- --help
 |prompt_for_input_args|bool|False|Whether you want to prompt for input arguments for each test.|
 |return_atomics|bool|False|Whether or not you want to return atomics instead of running them.|
 |config_file|str|None|A path to a conifg_file which is used to automate atomic-operator in environments.|
+|config_file_only|bool|False|Whether or not you want to run tests based on the provided config_file only.|
 |hosts|list|None|A list of one or more remote hosts to run a test on.|
 |username|str|None|Username for authentication of remote connections.|
 |password|str|None|Password for authentication of remote connections.|
@@ -152,8 +215,6 @@ atomic-operator run -- --help
 |ssh_port|int|22|SSH port for authentication of remote connections.|
 |ssh_timeout|int|5|SSH timeout for authentication of remote connections.|
 |**kwargs|dict|None|If additional flags are passed into the run command then we will attempt to match them with defined inputs within Atomic tests and replace their value with the provided value.|
-
-
 
 
 You should see a similar output to the following:
@@ -177,9 +238,16 @@ FLAGS
         Type: list
         Default: []
         One or more Atomic test GUIDs. Defaults to None.
+    --select_tests=SELECT_TESTS
+        Type: bool
+        Default: False
+        Select one or more tests from provided techniques. Defaults to False.
     --atomics_path=ATOMICS_PATH
         Default: '/U...
         The path of Atomic tests. Defaults to os.getcwd().
+    --input_arguments={}
+        Default: {}
+        A dictionary of input arguments to pass to the test.
     --check_prereqs=CHECK_PREREQS
         Default: False
         Whether or not to check for prereq dependencies (prereq_comand). Defaults to False.
@@ -208,6 +276,9 @@ FLAGS
         Type: Optional[]
         Default: None
         A path to a conifg_file which is used to automate atomic-operator in environments. Default to None.
+    --config_file_only=CONFIG_FILE_ONLY
+        Default: False
+        Whether or not you want to run tests based on the provided config_file only. Defaults to False.
     --hosts=HOSTS
         Default: []
         A list of one or more remote hosts to run a test on. Defaults to [].
@@ -311,3 +382,7 @@ See also the list of [contributors](https://github.com/swimlane/atomic-operator/
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details
+
+## Shoutout
+
+- Thanks to [keithmccammon](https://github.com/keithmccammon) for helping identify issues with macOS M1 based proccesssor and providing a fix
